@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -13,6 +14,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,7 +29,8 @@ type MonitConfig struct {
 }
 
 type ReportConfig struct {
-	Type string
+	Type           string
+	TimeStampField string
 }
 
 const (
@@ -47,6 +50,7 @@ func main() {
 
 	reportCmd := flag.NewFlagSet("report", flag.ExitOnError)
 	reportType := reportCmd.String("type", "text", "Report type. Valid values are text")
+	timeStampField := reportCmd.String("timestamp-field", "text", "Report type. Valid values are text")
 
 	if len(os.Args) < 2 {
 		_, _ = os.Stderr.WriteString("expected 'monit' or 'report' subcommands")
@@ -75,7 +79,8 @@ func main() {
 			panic(err)
 		}
 		reportConfig := ReportConfig{
-			Type: *reportType,
+			Type:           *reportType,
+			TimeStampField: *timeStampField,
 		}
 		_, _ = os.Stderr.WriteString(fmt.Sprintf("loaded config %+v \n", reportConfig))
 		report(reportConfig)
@@ -137,30 +142,53 @@ func monitor(appConfig MonitConfig) {
 	}
 }
 
-func report(appConfig ReportConfig) {
-	ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(nil))
-	if err != nil {
-		panic(fmt.Errorf("data is not in plain avro format %s: %w", "", err))
-	}
-	avroSchema := ocfReader.Codec().Schema()
-	fmt.Println("Schema")
-	fmt.Println("=====")
-	fmt.Println(avroSchema)
-	fmt.Println("Data")
-	fmt.Println("=====")
-	for ocfReader.Scan() {
-		record, _ := ocfReader.Read()
-		jsonRecord, err := json.Marshal(record)
-		if err != nil {
-			panic(fmt.Errorf("unable to marshal record %v as json: %w", record, err))
-		}
-		fmt.Println(string(jsonRecord))
-	}
-	fmt.Println()
+func report(reportConfig ReportConfig) {
 
-	latencies := []float64{43, 54, 56, 61, 62, 66}
-	percentile90, _ := stats.Percentile(latencies, 95)
-	percentile99, _ := stats.Percentile(latencies, 99)
+	scanner := bufio.NewScanner(os.Stdin)
+
+	latencies := make(stats.Float64Data, 0, 1000)
+	for scanner.Scan() {
+		text := scanner.Text()
+		var kafkaMessage kafka.Message
+		err := json.Unmarshal([]byte(text), &kafkaMessage)
+		if err != nil {
+			panic(fmt.Errorf("invalid data %s: %w", "", err))
+		}
+		ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(kafkaMessage.Value))
+		if err != nil {
+			panic(fmt.Errorf("invalid OCF data %s: %w", "", err))
+		}
+		for ocfReader.Scan() {
+			record, err := ocfReader.Read()
+			if err != nil {
+				panic(fmt.Errorf("invalid OCF data %s: %w", "", err))
+			}
+			recordMap, ok := record.(map[string]interface{})
+			if !ok {
+				panic(fmt.Errorf("invalid OCF data"))
+			}
+			timeStamp := fmt.Sprintf("%v", recordMap[reportConfig.TimeStampField])
+			atoi, err := strconv.Atoi(timeStamp)
+			if err != nil {
+				panic(fmt.Errorf("invalid OCF data %s: %w", "", err))
+			}
+			unix := time.Unix(int64(atoi), 0)
+			latency := float64(kafkaMessage.Time.Sub(unix)) / float64(time.Millisecond)
+			latencies = append(latencies, latency)
+		}
+		fmt.Println()
+
+	}
+
 	mean, _ := stats.Mean(latencies)
-	fmt.Println(percentile90, percentile99, mean)
+	percentile95, _ := stats.Percentile(latencies, 95)
+	percentile99, _ := stats.Percentile(latencies, 99)
+	fmt.Printf(`
+Latency
+=======
+Mean             %f
+95th Percentile  %f
+99th Percentile  %f
+`, mean, percentile95, percentile99)
+
 }
