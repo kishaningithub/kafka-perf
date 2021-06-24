@@ -143,34 +143,32 @@ func monitor(appConfig MonitConfig) {
 }
 
 func report(reportConfig ReportConfig) {
-
 	scanner := bufio.NewScanner(os.Stdin)
-
 	latencies := make(stats.Float64Data, 0, 1000)
 	for scanner.Scan() {
 		text := scanner.Text()
 		var kafkaMessage kafka.Message
 		err := json.Unmarshal([]byte(text), &kafkaMessage)
 		if err != nil {
-			panic(fmt.Errorf("invalid data %s: %w", "", err))
+			panic(fmt.Errorf("invalid data: %w", err))
 		}
 		ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(kafkaMessage.Value))
 		if err != nil {
-			panic(fmt.Errorf("invalid OCF data %s: %w", "", err))
+			panic(fmt.Errorf("invalid OCF data: %w", err))
 		}
 		for ocfReader.Scan() {
 			record, err := ocfReader.Read()
 			if err != nil {
-				panic(fmt.Errorf("invalid OCF data %s: %w", "", err))
+				panic(fmt.Errorf("invalid OCF data: %w", err))
 			}
 			recordMap, ok := record.(map[string]interface{})
 			if !ok {
-				panic(fmt.Errorf("invalid OCF data"))
+				panic(fmt.Errorf("invalid OCF data %v: %w", record, err))
 			}
 			timeStamp := fmt.Sprintf("%v", recordMap[reportConfig.TimeStampField])
 			atoi, err := strconv.Atoi(timeStamp)
 			if err != nil {
-				panic(fmt.Errorf("invalid OCF data %s: %w", "", err))
+				panic(fmt.Errorf("invalid OCF data %v: %w", recordMap, err))
 			}
 			unix := time.Unix(int64(atoi), 0)
 			latency := float64(kafkaMessage.Time.Sub(unix)) / float64(time.Millisecond)
