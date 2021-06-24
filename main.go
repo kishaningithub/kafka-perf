@@ -168,12 +168,15 @@ func report(reportConfig ReportConfig) {
 				panic(fmt.Errorf("invalid OCF data %v: %w", record, err))
 			}
 			timeStamp := fmt.Sprintf("%v", recordMap[reportConfig.TimeStampField])
+			os.Stderr.WriteString("recordtimeStamp " + timeStamp)
 			atoi, err := strconv.Atoi(timeStamp)
 			if err != nil {
 				panic(fmt.Errorf("invalid OCF data %v: %w", recordMap, err))
 			}
 			unix := time.Unix(int64(atoi), 0)
-			latency := float64(kafkaMessage.Time.Sub(unix)) / float64(time.Millisecond)
+			kafkaTimeStamp := kafkaMessage.Time
+			os.Stderr.WriteString(fmt.Sprintf("kafkaTimeStamp %d", kafkaTimeStamp.UnixNano()))
+			latency := float64(kafkaTimeStamp.Sub(unix)) / float64(time.Millisecond)
 			latencies = append(latencies, latency)
 		}
 	}
