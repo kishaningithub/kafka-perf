@@ -3,9 +3,7 @@ Get performance metrics based on kafka events
 
 ![build workflow](https://github.com/kishaningithub/kafka-perf/actions/workflows/build.yml/badge.svg)
 
-Tail kafka avro topic data without confluent schema registry overhead
-
-This expects the data to be written in [Object Container File (OCF)](https://avro.apache.org/docs/current/spec.html#Object+Container+Files) format
+This currently expects the data to be written in [Object Container File (OCF)](https://avro.apache.org/docs/current/spec.html#Object+Container+Files) format
 
 ## Installation
 
@@ -23,8 +21,8 @@ $ brew upgrade kafka-perf
 ## Usage
 
 ```shell
-$ kafka-perf -help
-Usage of kafka-perf:
+$ kafka-perf monit -help
+Usage of monit:
   -bootstrap-servers string
     	REQUIRED: The server(s) to connect to.
   -tls-ca-cert string
@@ -37,6 +35,13 @@ Usage of kafka-perf:
     	Valid values are NONE,TLS,MTLS (default "NONE")
   -topic string
     	REQUIRED: The topic id to consume on.
+    	
+$ kafka-perf report -help
+Usage of report:
+  -timestamp-field string
+    	Field which has the unix timestamp. Eg 1617104831727
+  -type string
+    	Report type. Valid values are text (default "text")
 ```
 
 ## Examples
@@ -44,65 +49,30 @@ Usage of kafka-perf:
 ### Basic usage
 
 ```shell
-$ kafka-perf --topic example --bootstrap-servers localhost:9092
+# Collecting metrics
+$ kafka-perf monit --topic example --bootstrap-servers localhost:9092 > result.txt
 
-Schema
-=====
-{"fields":[{"name":"time","type":"long"},{"default":"","description":"Process id","name":"process_id","type":"string"}],"name":"example","namespace":"com.example","type":"record","version":1}
-Data
-=====
-{"time":1617104831727, "process_id":"ID1"}
-{"time":1717104831727, "process_id":"ID2"}
+# Querying metrics
+$ cat result.txt | kafka-perf report -type=text -timestamp-field=time
 
-Schema
-=====
-{"fields":[{"name":"time","type":"long"}],"name":"example","namespace":"com.example","type":"record","version":2}
-Data
-=====
-{"time":1817104831727}
-{"time":1917104831727}
 ```
 
 ### With TLS
 
 ```shell
-$ kafka-perf --topic example --bootstrap-servers localhost:9092 -tls-mode TLS -tls-ca-cert /certs/ca.pem
+# Collecting metrics
+$ kafka-perf monit --topic example --bootstrap-servers localhost:9092 -tls-mode TLS -tls-ca-cert /certs/ca.pem  > result.txt
 
-Schema
-=====
-{"fields":[{"name":"time","type":"long"},{"default":"","description":"Process id","name":"process_id","type":"string"}],"name":"example","namespace":"com.example","type":"record","version":1}
-Data
-=====
-{"time":1617104831727, "process_id":"ID1"}
-{"time":1717104831727, "process_id":"ID2"}
-
-Schema
-=====
-{"fields":[{"name":"time","type":"long"}],"name":"example","namespace":"com.example","type":"record","version":2}
-Data
-=====
-{"time":1817104831727}
-{"time":1917104831727}
+# Querying metrics
+$ cat result.txt | kafka-perf report -type=text -timestamp-field=time
 ```
 
 ### With MTLS
 
 ```shell
-$ kafka-perf --topic example --bootstrap-servers localhost:9092 -tls-mode MTLS -tls-cert /certs/cert.pem -tls-key /certs/key.pem -tls-ca-cert /certs/ca.pem
+# Collecting metrics
+$ kafka-perf monit --topic example --bootstrap-servers localhost:9092 -tls-mode MTLS -tls-cert /certs/cert.pem -tls-key /certs/key.pem -tls-ca-cert /certs/ca.pem
 
-Schema
-=====
-{"fields":[{"name":"time","type":"long"},{"default":"","description":"Process id","name":"process_id","type":"string"}],"name":"example","namespace":"com.example","type":"record","version":1}
-Data
-=====
-{"time":1617104831727, "process_id":"ID1"}
-{"time":1717104831727, "process_id":"ID2"}
-
-Schema
-=====
-{"fields":[{"name":"time","type":"long"}],"name":"example","namespace":"com.example","type":"record","version":2}
-Data
-=====
-{"time":1817104831727}
-{"time":1917104831727}
+# Querying metrics
+$ cat result.txt | kafka-perf report -type=text -timestamp-field=time
 ```

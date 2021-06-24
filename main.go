@@ -145,6 +145,7 @@ func monitor(appConfig MonitConfig) {
 func report(reportConfig ReportConfig) {
 	scanner := bufio.NewScanner(os.Stdin)
 	latencies := make(stats.Float64Data, 0, 1000)
+	partitionDistribution := make(map[int]int)
 	for scanner.Scan() {
 		text := scanner.Text()
 		var kafkaMessage kafka.Message
@@ -152,6 +153,7 @@ func report(reportConfig ReportConfig) {
 		if err != nil {
 			panic(fmt.Errorf("invalid data: %w", err))
 		}
+		partitionDistribution[kafkaMessage.Partition]++
 		ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(kafkaMessage.Value))
 		if err != nil {
 			panic(fmt.Errorf("invalid OCF data: %w", err))
@@ -174,19 +176,41 @@ func report(reportConfig ReportConfig) {
 			latency := float64(kafkaMessage.Time.Sub(unix)) / float64(time.Millisecond)
 			latencies = append(latencies, latency)
 		}
-		fmt.Println()
-
 	}
 
-	mean, _ := stats.Mean(latencies)
-	percentile95, _ := stats.Percentile(latencies, 95)
-	percentile99, _ := stats.Percentile(latencies, 99)
-	fmt.Printf(`
+	mean, err := stats.Mean(latencies)
+	if err != nil {
+		panic(fmt.Errorf("error while computing mean: %w", err))
+	}
+	percentile95, err := stats.Percentile(latencies, 95)
+	if err != nil {
+		panic(fmt.Errorf("error while computing 95th percentile: %w", err))
+	}
+	percentile99, err := stats.Percentile(latencies, 99)
+	if err != nil {
+		panic(fmt.Errorf("error while computing 99th percentile: %w", err))
+	}
+	totalNoOfEvents := len(latencies)
+	var report string
+	report += fmt.Sprintf(`
+Total No. Of events %d
+
 Latency
 =======
-Mean             %f
-95th Percentile  %f
-99th Percentile  %f
-`, mean, percentile95, percentile99)
+Mean                %f
+95th Percentile     %f
+99th Percentile     %f
+`, totalNoOfEvents, mean, percentile95, percentile99)
+
+	report += fmt.Sprintf(`
+Partition
+=========
+`)
+
+	for partitionKey, noOfMessages := range partitionDistribution {
+		report += fmt.Sprintf("partition %d  %d messages\n", partitionKey, noOfMessages)
+	}
+
+	fmt.Println(report)
 
 }
