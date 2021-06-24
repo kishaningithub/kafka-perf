@@ -1,13 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/linkedin/goavro"
+	"github.com/montanaflynn/stats"
+	"github.com/segmentio/kafka-go"
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 )
 
 type MonitConfig struct {
@@ -100,4 +107,60 @@ func getTLSConfig(config MonitConfig) *tls.Config {
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
 	return tlsConfig
+}
+
+func monitor(appConfig MonitConfig) {
+	kafkaReaderConfig := kafka.ReaderConfig{
+		Brokers: appConfig.BootstrapServers,
+		GroupID: "monitGroupID",
+		Topic:   appConfig.Topic,
+	}
+	if appConfig.TlsMode != TLS_MODE_NONE {
+		tlsConfig := getTLSConfig(appConfig)
+		kafkaReaderConfig.Dialer = &kafka.Dialer{
+			Timeout:   10 * time.Second,
+			DualStack: true,
+			TLS:       tlsConfig,
+		}
+	}
+	reader := kafka.NewReader(kafkaReaderConfig)
+	for {
+		message, err := reader.ReadMessage(context.Background())
+		if err != nil {
+			panic(fmt.Errorf("error while reading message from kafka topic %s: %w", appConfig.Topic, err))
+		}
+		marshal, err := json.Marshal(message)
+		if err != nil {
+			panic(fmt.Errorf("error while reading message from kafka topic %s: %w", appConfig.Topic, err))
+		}
+		fmt.Println(string(marshal))
+	}
+}
+
+func report(appConfig ReportConfig) {
+	ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(nil))
+	if err != nil {
+		panic(fmt.Errorf("data is not in plain avro format %s: %w", "", err))
+	}
+	avroSchema := ocfReader.Codec().Schema()
+	fmt.Println("Schema")
+	fmt.Println("=====")
+	fmt.Println(avroSchema)
+	fmt.Println("Data")
+	fmt.Println("=====")
+	for ocfReader.Scan() {
+		record, _ := ocfReader.Read()
+		jsonRecord, err := json.Marshal(record)
+		if err != nil {
+			panic(fmt.Errorf("unable to marshal record %v as json: %w", record, err))
+		}
+		fmt.Println(string(jsonRecord))
+	}
+	fmt.Println()
+
+	latencies := []float64{43, 54, 56, 61, 62, 66}
+	percentile90, _ := stats.Percentile(latencies, 95)
+	percentile99, _ := stats.Percentile(latencies, 99)
+	mean, _ := stats.Mean(latencies)
+	fmt.Println(percentile90, percentile99, mean)
 }
