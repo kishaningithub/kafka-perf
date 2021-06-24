@@ -1,0 +1,31 @@
+project_name: kafka-perf
+
+release:
+  github:
+    owner: kishaningithub
+    name: kafka-perf
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - main: ./main.go
+    binary: kafka-perf
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+brews:
+  - name: kafka-perf
+    tap:
+      owner: kishaningithub
+      name: homebrew-tap
+    url_template: "https://github.com/kishaningithub/kafka-perf/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    folder: Formula
+    homepage: "https://github.com/kishaningithub/kafka-perf"
+    description: "Tail kafka avro topic data without confluent schema registry overhead"
