@@ -50,7 +50,7 @@ func main() {
 
 	reportCmd := flag.NewFlagSet("report", flag.ExitOnError)
 	reportType := reportCmd.String("type", "text", "Report type. Valid values are text")
-	timeStampField := reportCmd.String("timestamp-field", "text", "Report type. Valid values are text")
+	timeStampField := reportCmd.String("timestamp-field", "", "Field which has the unix timestamp. Eg 1617104831727")
 
 	if len(os.Args) < 2 {
 		_, _ = os.Stderr.WriteString("expected 'monit' or 'report' subcommands")
