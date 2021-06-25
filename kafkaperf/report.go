@@ -1,4 +1,4 @@
-package monitor
+package kafkaperf
 
 import (
 	"bufio"

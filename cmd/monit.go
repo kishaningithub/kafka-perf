@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/kishaningithub/kafka-perf/lib"
+	"github.com/kishaningithub/kafka-perf/kafkaperf"
 	"os"
 	"strings"
 
@@ -21,7 +21,7 @@ var monitCmd = &cobra.Command{
 	Use:   "monit",
 	Short: "Monitoring kafka events",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		config := monitor.Config{
+		config := kafkaperf.MonitorConfig{
 			Topic:            topic,
 			BootstrapServers: strings.Split(bootstrapServersCSV, ","),
 			TlsMode:          tlsMode,
@@ -29,7 +29,7 @@ var monitCmd = &cobra.Command{
 			KeyLocation:      keyLocation,
 			CACertLocation:   caCertLocation,
 		}
-		monit, err := monitor.New(os.Stdout, config)
+		monit, err := kafkaperf.NewMonitor(os.Stdout, config)
 		if err != nil {
 			return err
 		}

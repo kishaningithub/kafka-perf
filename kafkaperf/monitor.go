@@ -1,4 +1,4 @@
-package monitor
+package kafkaperf
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type Config struct {
+type MonitorConfig struct {
 	Topic            string
 	BootstrapServers []string
 	TlsMode          string
@@ -37,7 +37,7 @@ type monitor struct {
 	kafkaReader *kafka.Reader
 }
 
-func New(destination io.Writer, appConfig Config) (Monitor, error) {
+func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error) {
 	kafkaReaderConfig := kafka.ReaderConfig{
 		Brokers:     appConfig.BootstrapServers,
 		GroupID:     uuid.New().String(),
@@ -79,7 +79,7 @@ func (monitor *monitor) Start() error {
 	}
 }
 
-func getTLSConfig(config Config) (*tls.Config, error) {
+func getTLSConfig(config MonitorConfig) (*tls.Config, error) {
 	caCertLocation := config.CACertLocation
 	caCert, err := ioutil.ReadFile(caCertLocation)
 	if err != nil {

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	monitor "github.com/kishaningithub/kafka-perf/lib"
+	"github.com/kishaningithub/kafka-perf/kafkaperf"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -15,11 +15,11 @@ var reportCmd = &cobra.Command{
 	Use:   "report",
 	Short: "Outputs a report in the given format",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		reportConfig := monitor.ReportConfig{
+		reportConfig := kafkaperf.ReportConfig{
 			Type:           reportType,
 			TimeStampField: timeStampField,
 		}
-		reporter := monitor.NewReporter(os.Stdin, reportConfig)
+		reporter := kafkaperf.NewReporter(os.Stdin, reportConfig)
 		return reporter.GenerateReport(os.Stdout)
 	},
 }
