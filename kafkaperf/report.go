@@ -79,36 +79,10 @@ Partition
 }
 
 func (reporter *reporter) aggregateData() (AggregateData, error) {
-	scanner := bufio.NewScanner(reporter.source)
-	latencies := make(stats.Float64Data, 0, 1000)
-	partitionDistribution := make(map[int]int)
-	for scanner.Scan() {
-		text := scanner.Text()
-		var kafkaMessage kafka.Message
-		err := json.Unmarshal([]byte(text), &kafkaMessage)
-		if err != nil {
-			return AggregateData{}, err
-		}
-		partitionDistribution[kafkaMessage.Partition]++
-		ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(kafkaMessage.Value))
-		if err != nil {
-			return AggregateData{}, err
-		}
-		for ocfReader.Scan() {
-			record, err := ocfReader.Read()
-			if err != nil {
-				return AggregateData{}, err
-			}
-			messageSentTime, err := reporter.extractTimeStampFromAvroData(record, err)
-			if err != nil {
-				return AggregateData{}, err
-			}
-			messageReceivedTime := kafkaMessage.Time
-			latency := float64(messageReceivedTime.Sub(messageSentTime)) / float64(time.Millisecond)
-			latencies = append(latencies, latency)
-		}
+	latencies, partitionDistribution, err := reporter.getLatenciesAndPartitionDistribution()
+	if err != nil {
+		return AggregateData{}, err
 	}
-
 	mean, err := stats.Mean(latencies)
 	if err != nil {
 		return AggregateData{}, err
@@ -129,6 +103,39 @@ func (reporter *reporter) aggregateData() (AggregateData, error) {
 		percentile99:          percentile99,
 		partitionDistribution: partitionDistribution,
 	}, nil
+}
+
+func (reporter *reporter) getLatenciesAndPartitionDistribution() (stats.Float64Data, map[int]int, error) {
+	scanner := bufio.NewScanner(reporter.source)
+	latencies := make(stats.Float64Data, 0, 1000)
+	partitionDistribution := make(map[int]int)
+	for scanner.Scan() {
+		text := scanner.Text()
+		var kafkaMessage kafka.Message
+		err := json.Unmarshal([]byte(text), &kafkaMessage)
+		if err != nil {
+			return nil, nil, err
+		}
+		partitionDistribution[kafkaMessage.Partition]++
+		ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(kafkaMessage.Value))
+		if err != nil {
+			return nil, nil, err
+		}
+		for ocfReader.Scan() {
+			record, err := ocfReader.Read()
+			if err != nil {
+				return nil, nil, err
+			}
+			messageSentTime, err := reporter.extractTimeStampFromAvroData(record, err)
+			if err != nil {
+				return nil, nil, err
+			}
+			messageReceivedTime := kafkaMessage.Time
+			latency := float64(messageReceivedTime.Sub(messageSentTime)) / float64(time.Millisecond)
+			latencies = append(latencies, latency)
+		}
+	}
+	return latencies, partitionDistribution, nil
 }
 
 func (reporter *reporter) extractTimeStampFromAvroData(record interface{}, err error) (time.Time, error) {
