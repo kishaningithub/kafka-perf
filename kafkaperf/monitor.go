@@ -6,10 +6,12 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"io"
 	"io/ioutil"
+	"os"
 	"time"
 )
 
@@ -38,6 +40,7 @@ type monitor struct {
 }
 
 func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error) {
+	baseErrMsg := "error while creating monitor"
 	kafkaReaderConfig := kafka.ReaderConfig{
 		Brokers:     appConfig.BootstrapServers,
 		GroupID:     uuid.New().String(),
@@ -47,7 +50,7 @@ func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error)
 	if appConfig.TlsMode != TLS_MODE_NONE {
 		tlsConfig, err := getTLSConfig(appConfig)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, baseErrMsg)
 		}
 		kafkaReaderConfig.Dialer = &kafka.Dialer{
 			Timeout:   10 * time.Second,
@@ -63,19 +66,21 @@ func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error)
 }
 
 func (monitor *monitor) Start() error {
-	for {
+	baseErrMsg := "error while monitoring kafka events"
+	for i := 0; ; i++ {
 		message, err := monitor.kafkaReader.ReadMessage(context.Background())
 		if err != nil {
-			return err
+			return errors.Wrap(err, baseErrMsg)
 		}
 		marshal, err := json.Marshal(message)
 		if err != nil {
-			return err
+			return errors.Wrap(err, baseErrMsg)
 		}
 		_, err = fmt.Fprintln(monitor.destination, string(marshal))
 		if err != nil {
-			return err
+			return errors.Wrap(err, baseErrMsg)
 		}
+		_, _ = fmt.Fprintf(os.Stderr, "\r%d events stored", i)
 	}
 }
 
@@ -83,7 +88,7 @@ func getTLSConfig(config MonitorConfig) (*tls.Config, error) {
 	caCertLocation := config.CACertLocation
 	caCert, err := ioutil.ReadFile(caCertLocation)
 	if err != nil {
-		return nil, fmt.Errorf("error while loading ca cert from %s: %w", caCertLocation, err)
+		return nil, errors.Wrapf(err, "error while loading ca cert from %s", caCertLocation)
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
@@ -96,7 +101,7 @@ func getTLSConfig(config MonitorConfig) (*tls.Config, error) {
 		keyLocation := config.KeyLocation
 		cert, err := tls.LoadX509KeyPair(certLocation, keyLocation)
 		if err != nil {
-			return nil, fmt.Errorf("error while loading cert %s and key %s: %w", certLocation, keyLocation, err)
+			return nil, errors.Wrapf(err, "error while loading cert %s and key %s", certLocation, keyLocation)
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}

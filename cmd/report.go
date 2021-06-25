@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	reportType     string
-	timeStampField string
+	reportType           string
+	reportTimeStampField string
 )
 
 var reportCmd = &cobra.Command{
@@ -17,9 +17,13 @@ var reportCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		reportConfig := kafkaperf.ReportConfig{
 			Type:           reportType,
-			TimeStampField: timeStampField,
+			TimeStampField: reportTimeStampField,
 		}
-		reporter := kafkaperf.NewReporter(os.Stdin, reportConfig)
+		encoder := kafkaperf.NewEncoder(os.Stdin, kafkaperf.EncoderConfig{
+			TimeStampField: reportTimeStampField,
+		})
+		metricsCalculator := kafkaperf.NewMetricsCalculator()
+		reporter := kafkaperf.NewReporter(reportConfig, encoder, metricsCalculator)
 		return reporter.GenerateReport(os.Stdout)
 	},
 }
@@ -28,7 +32,7 @@ func init() {
 	rootCmd.AddCommand(reportCmd)
 
 	reportCmd.Flags().StringVar(&reportType, "type", "text", "Report type. Valid values are text")
-	reportCmd.Flags().StringVar(&timeStampField, "timestamp-field", "", "Field which has the unix timestamp. Eg 1617104831727")
+	reportCmd.Flags().StringVar(&reportTimeStampField, "timestamp-field", "", "Field which has the unix timestamp. Eg 1617104831727")
 	err := reportCmd.MarkFlagRequired("timestamp-field")
 	if err != nil {
 		panic(err)
