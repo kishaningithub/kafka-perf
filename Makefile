@@ -25,13 +25,10 @@ tidy-deps:
 	go mod tidy
 
 compile:
-	go build -ldflags '-s -w -X github.com/kishaningithub/kafka-perf/cmd.Version=$(VERSION)'
+	go build
 
 unit-test:
 	go test -v ./...
-
-run:
-	go run -ldflags "-s -w -X github.com/kishaningithub/kafka-perf/cmd.Version=$(VERSION)" main.go $(args)
 
 check-version:
 	./kafka-perf --version
