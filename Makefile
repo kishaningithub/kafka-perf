@@ -1,9 +1,12 @@
+HOSTOS=$(shell uname | tr "[:upper:]" "[:lower:]")
 VERSION=$(shell git tag --sort=-version:refname | head -n 1)
 
 TOOLS_DIR=tools
 TOOLS_VERSION_NANCY=v1.0.21
 
-NANCY_EXISTS:=$(shell test -e "$(GOLANGCI_LINT)" && echo -n "binary exists")
+NANCY=$(TOOLS_DIR)/nancy-$(TOOLS_VERSION_NANCY)
+
+NANCY_EXISTS:=$(shell test -e "$(NANCY)" && echo -n "binary exists")
 
 setup: ## Setup necessary binary dependencies
 	mkdir -p $(TOOLS_DIR)
@@ -22,12 +25,18 @@ tidy-deps:
 	go mod tidy
 
 compile:
-	go build -ldflags "-s -w -X kafka-perf/cmd.Version=$(VERSION)"  main.go
+	go build -ldflags '-s -w -X github.com/kishaningithub/kafka-perf/cmd.Version=$(VERSION)'
 
 unit-test:
 	go test -v ./...
 
 run:
-	go run -ldflags "-s -w -X kafka-perf/cmd.Version=$(VERSION)" main.go $(args)
+	go run -ldflags "-s -w -X github.com/kishaningithub/kafka-perf/cmd.Version=$(VERSION)" main.go $(args)
 
-build: setup download-deps tidy-deps fmt unit-test compile
+check-version:
+	./kafka-perf --version
+
+dependency-check: ## Ensure dependencies have no vulnerabilities
+	go list -json -m all | $(NANCY) sleuth --skip-update-check
+
+build: setup download-deps tidy-deps fmt unit-test compile check-version
