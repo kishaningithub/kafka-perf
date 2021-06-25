@@ -1,6 +1,33 @@
-build:
+VERSION=$(shell git tag --sort=-version:refname | head -n 1)
+
+TOOLS_DIR=tools
+TOOLS_VERSION_NANCY=v1.0.21
+
+NANCY_EXISTS:=$(shell test -e "$(GOLANGCI_LINT)" && echo -n "binary exists")
+
+setup: ## Setup necessary binary dependencies
+	mkdir -p $(TOOLS_DIR)
+ifndef NANCY_EXISTS
+	wget -O $(TOOLS_DIR)/nancy-$(TOOLS_VERSION_NANCY) https://github.com/sonatype-nexus-community/nancy/releases/download/$(TOOLS_VERSION_NANCY)/nancy-$(TOOLS_VERSION_NANCY)-$(HOSTOS)-amd64
+	chmod +x $(TOOLS_DIR)/nancy-$(TOOLS_VERSION_NANCY)
+endif
+
+fmt: ## Run the code formatter
+	gofmt -l -s -w .
+
+download-deps:
 	go mod download
-	go fmt ./...
-	go test -v ./...
+
+tidy-deps:
 	go mod tidy
-	go build main.go
+
+compile:
+	go build -ldflags "-s -w -X kafka-perf/cmd.Version=$(VERSION)"  main.go
+
+unit-test:
+	go test -v ./...
+
+run:
+	go run -ldflags "-s -w -X kafka-perf/cmd.Version=$(VERSION)" main.go $(args)
+
+build: setup download-deps tidy-deps fmt unit-test compile
