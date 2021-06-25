@@ -30,10 +30,7 @@ compile:
 unit-test:
 	go test -v ./...
 
-check-version:
-	./kafka-perf --version
-
 dependency-check: ## Ensure dependencies have no vulnerabilities
 	go list -json -m all | $(NANCY) sleuth --skip-update-check
 
-build: setup download-deps tidy-deps fmt unit-test compile check-version
+build: setup download-deps tidy-deps fmt unit-test compile
