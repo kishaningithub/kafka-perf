@@ -50,7 +50,7 @@ func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error)
 		StartOffset:   kafka.LastOffset,
 		MinBytes:      1e6,  // 1MB
 		MaxBytes:      10e6, // 10MB
-		QueueCapacity: 10_000,
+		QueueCapacity: 10e3,
 	}
 	if appConfig.TlsMode != TLS_MODE_NONE {
 		tlsConfig, err := getTLSConfig(appConfig)
