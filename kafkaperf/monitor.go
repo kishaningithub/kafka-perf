@@ -9,11 +9,10 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
+	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 	"io"
 	"io/ioutil"
-	"log"
-	"sync/atomic"
 	"time"
 )
 
@@ -34,11 +33,13 @@ const (
 
 type Monitor interface {
 	Start() error
+	Stats() MonitorMetrics
 }
 
 type monitor struct {
-	destination io.Writer
-	kafkaReader *kafka.Reader
+	destination    io.Writer
+	kafkaReader    *kafka.Reader
+	monitorMetrics *monitorMetrics
 }
 
 func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error) {
@@ -65,33 +66,41 @@ func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error)
 	}
 	kafkaReader := kafka.NewReader(kafkaReaderConfig)
 	return &monitor{
-		destination: destination,
-		kafkaReader: kafkaReader,
+		destination:    destination,
+		kafkaReader:    kafkaReader,
+		monitorMetrics: &monitorMetrics{},
 	}, nil
 }
 
 type MonitorMetrics struct {
-	NoOfEventsReceived  int64
-	NoOfEventsRead      int64
-	Lag                 int64
-	NoOfEventsInProcess int64
-	NoOfEventsProcessed int64
+	EventsReceived  int64
+	EventsRead      int64
+	Lag             int64
+	EventsInProcess int64
+	EventsProcessed int64
+}
+
+type monitorMetrics struct {
+	eventsReceived  atomic.Int64
+	eventsRead      atomic.Int64
+	eventsInProcess atomic.Int64
+	eventsProcessed atomic.Int64
 }
 
 func (monitor *monitor) Start() (err error) {
 	baseErrMsg := "error while monitoring kafka events"
 	destination := monitor.destination
-	var monitorMetrics MonitorMetrics
+	monitorMetrics := monitor.monitorMetrics
 	events := make(chan string, DefaultChannelBufferSize)
 	operation, _ := errgroup.WithContext(context.Background())
 	operation.Go(func() error {
 		for event := range events {
-			atomic.AddInt64(&monitorMetrics.NoOfEventsInProcess, -1)
+			monitorMetrics.eventsInProcess.Sub(1)
 			_, err := fmt.Fprintln(destination, event)
 			if err != nil {
 				return errors.Wrap(err, baseErrMsg)
 			}
-			atomic.AddInt64(&monitorMetrics.NoOfEventsProcessed, 1)
+			monitorMetrics.eventsProcessed.Add(1)
 		}
 		return nil
 	})
@@ -102,8 +111,8 @@ func (monitor *monitor) Start() (err error) {
 			if err != nil {
 				return errors.Wrap(err, baseErrMsg)
 			}
-			atomic.AddInt64(&monitorMetrics.NoOfEventsRead, 1)
-			atomic.AddInt64(&monitorMetrics.NoOfEventsInProcess, 1)
+			monitorMetrics.eventsRead.Add(1)
+			monitorMetrics.eventsInProcess.Add(1)
 			marshal, err := json.Marshal(message)
 			if err != nil {
 				return errors.Wrap(err, baseErrMsg)
@@ -111,17 +120,20 @@ func (monitor *monitor) Start() (err error) {
 			events <- string(marshal)
 		}
 	})
-	operation.Go(func() error {
-		for {
-			time.Sleep(2 * time.Second)
-			stats := monitor.kafkaReader.Stats()
-			monitorMetrics.Lag = stats.Lag
-			atomic.AddInt64(&monitorMetrics.NoOfEventsReceived, stats.Messages)
-			jsonMetrics, _ := json.Marshal(monitorMetrics)
-			log.Println(string(jsonMetrics))
-		}
-	})
 	return operation.Wait()
+}
+
+func (monitor *monitor) Stats() MonitorMetrics {
+	stats := monitor.kafkaReader.Stats()
+	monitorMetrics := monitor.monitorMetrics
+	monitorMetrics.eventsReceived.Add(stats.Messages)
+	return MonitorMetrics{
+		EventsReceived:  monitorMetrics.eventsReceived.Load(),
+		EventsRead:      monitorMetrics.eventsRead.Load(),
+		Lag:             stats.Lag,
+		EventsInProcess: monitorMetrics.eventsInProcess.Load(),
+		EventsProcessed: monitorMetrics.eventsProcessed.Load(),
+	}
 }
 
 func getTLSConfig(config MonitorConfig) (*tls.Config, error) {

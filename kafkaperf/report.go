@@ -4,31 +4,42 @@ import (
 	"context"
 	"fmt"
 	"github.com/cockroachdb/errors"
+	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 	"io"
-	"os"
 )
 
-type ReportConfig struct {
+type ReporterConfig struct {
 	Type           string
 	TimeStampField string
 }
 
+type ReporterStats struct {
+	RecordsProcessed int64
+}
+
+type reporterStats struct {
+	recordsProcessed atomic.Int64
+}
+
 type Reporter interface {
 	GenerateReport(writer io.Writer) error
+	Stats() ReporterStats
 }
 
 type reporter struct {
-	reportConfig      ReportConfig
+	reportConfig      ReporterConfig
 	encoder           Encoder
 	metricsCalculator MetricsCalculator
+	reporterStats     *reporterStats
 }
 
-func NewReporter(reportConfig ReportConfig, encoder Encoder, metricsCalculator MetricsCalculator) Reporter {
+func NewReporter(reportConfig ReporterConfig, encoder Encoder, metricsCalculator MetricsCalculator) Reporter {
 	return &reporter{
 		reportConfig:      reportConfig,
 		encoder:           encoder,
 		metricsCalculator: metricsCalculator,
+		reporterStats:     &reporterStats{},
 	}
 }
 
@@ -44,6 +55,13 @@ func (reporter *reporter) GenerateReport(writer io.Writer) error {
 		return errors.Wrap(err, baseErrMsg)
 	}
 	return nil
+}
+
+func (reporter *reporter) Stats() ReporterStats {
+	stats := reporter.reporterStats
+	return ReporterStats{
+		RecordsProcessed: stats.recordsProcessed.Load(),
+	}
 }
 
 func (reporter *reporter) textReport(aggregateData Metrics) string {
@@ -80,11 +98,9 @@ func (reporter *reporter) aggregateData() (Metrics, error) {
 	operation.Go(func() error {
 		return reporter.encoder.EncodeAsStruct(rawMetricsDataStream)
 	})
-	i := 0
 	for rawMetricsData := range rawMetricsDataStream {
 		reporter.metricsCalculator.AddRawMetric(rawMetricsData)
-		i++
-		_, _ = fmt.Fprintf(os.Stderr, "\r%d events processed", i)
+		reporter.reporterStats.recordsProcessed.Add(1)
 	}
 	return reporter.metricsCalculator.GetMetrics(), operation.Wait()
 }

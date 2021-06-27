@@ -12,6 +12,7 @@ require (
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/segmentio/kafka-go v0.4.16
 	github.com/spf13/cobra v1.1.3
+	go.uber.org/atomic v1.8.0
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/linkedin/goavro.v1 v1.0.5 // indirect

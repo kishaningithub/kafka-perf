@@ -1,9 +1,15 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/kishaningithub/kafka-perf/kafkaperf"
+	"golang.org/x/sync/errgroup"
+	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -33,7 +39,23 @@ var monitCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return monit.Start()
+		operation, _ := errgroup.WithContext(context.Background())
+		operation.Go(func() error {
+			return monit.Start()
+		})
+		operation.Go(func() error {
+			for {
+				stats := monit.Stats()
+				if Verbose {
+					statsJson, _ := json.Marshal(stats)
+					log.Println(string(statsJson))
+				} else {
+					_, _ = fmt.Fprintf(os.Stderr, "\r%d events processed", stats.EventsProcessed)
+				}
+				time.Sleep(2 * time.Second)
+			}
+		})
+		return operation.Wait()
 	},
 }
 
