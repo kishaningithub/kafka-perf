@@ -9,9 +9,11 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"io/ioutil"
-	"os"
+	"log"
+	"sync/atomic"
 	"time"
 )
 
@@ -42,10 +44,13 @@ type monitor struct {
 func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error) {
 	baseErrMsg := "error while creating monitor"
 	kafkaReaderConfig := kafka.ReaderConfig{
-		Brokers:     appConfig.BootstrapServers,
-		GroupID:     uuid.New().String(),
-		Topic:       appConfig.Topic,
-		StartOffset: kafka.LastOffset,
+		Brokers:       appConfig.BootstrapServers,
+		GroupID:       uuid.New().String(),
+		Topic:         appConfig.Topic,
+		StartOffset:   kafka.LastOffset,
+		MinBytes:      1e6,  // 1MB
+		MaxBytes:      10e6, // 10MB
+		QueueCapacity: 10_000,
 	}
 	if appConfig.TlsMode != TLS_MODE_NONE {
 		tlsConfig, err := getTLSConfig(appConfig)
@@ -65,23 +70,58 @@ func NewMonitor(destination io.Writer, appConfig MonitorConfig) (Monitor, error)
 	}, nil
 }
 
-func (monitor *monitor) Start() error {
+type MonitorMetrics struct {
+	NoOfEventsReceived  int64
+	NoOfEventsRead      int64
+	Lag                 int64
+	NoOfEventsInProcess int64
+	NoOfEventsProcessed int64
+}
+
+func (monitor *monitor) Start() (err error) {
 	baseErrMsg := "error while monitoring kafka events"
-	for i := 0; ; i++ {
-		message, err := monitor.kafkaReader.ReadMessage(context.Background())
-		if err != nil {
-			return errors.Wrap(err, baseErrMsg)
+	destination := monitor.destination
+	var monitorMetrics MonitorMetrics
+	events := make(chan string, DefaultChannelBufferSize)
+	operation, _ := errgroup.WithContext(context.Background())
+	operation.Go(func() error {
+		for event := range events {
+			atomic.AddInt64(&monitorMetrics.NoOfEventsInProcess, -1)
+			_, err := fmt.Fprintln(destination, event)
+			if err != nil {
+				return errors.Wrap(err, baseErrMsg)
+			}
+			atomic.AddInt64(&monitorMetrics.NoOfEventsProcessed, 1)
 		}
-		marshal, err := json.Marshal(message)
-		if err != nil {
-			return errors.Wrap(err, baseErrMsg)
+		return nil
+	})
+	operation.Go(func() error {
+		defer close(events)
+		for {
+			message, err := monitor.kafkaReader.FetchMessage(context.Background())
+			if err != nil {
+				return errors.Wrap(err, baseErrMsg)
+			}
+			atomic.AddInt64(&monitorMetrics.NoOfEventsRead, 1)
+			atomic.AddInt64(&monitorMetrics.NoOfEventsInProcess, 1)
+			marshal, err := json.Marshal(message)
+			if err != nil {
+				return errors.Wrap(err, baseErrMsg)
+			}
+			events <- string(marshal)
 		}
-		_, err = fmt.Fprintln(monitor.destination, string(marshal))
-		if err != nil {
-			return errors.Wrap(err, baseErrMsg)
+	})
+	operation.Go(func() error {
+		for {
+			time.Sleep(2 * time.Second)
+			stats := monitor.kafkaReader.Stats()
+			monitorMetrics.Lag = stats.Lag
+			atomic.AddInt64(&monitorMetrics.NoOfEventsReceived, stats.Messages)
+			jsonMetrics, _ := json.Marshal(monitorMetrics)
+			log.Println(string(jsonMetrics))
 		}
-		_, _ = fmt.Fprintf(os.Stderr, "\r%d events stored", i)
-	}
+	})
+	return operation.Wait()
 }
 
 func getTLSConfig(config MonitorConfig) (*tls.Config, error) {

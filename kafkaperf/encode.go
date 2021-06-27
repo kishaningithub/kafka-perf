@@ -22,13 +22,32 @@ type EncoderConfig struct {
 }
 
 type RawMetricsData struct {
-	MessageSentTime     time.Time `csv:"MessageSentTime"`
-	MessageReceivedTime time.Time `csv:"MessageReceivedTime"`
-	Partition           int       `csv:"Partition"`
+	MessageSentTime     time.Time
+	MessageReceivedTime time.Time
+	Partition           int
 }
 
 func (rawMetricsData RawMetricsData) Latency() time.Duration {
 	return rawMetricsData.MessageReceivedTime.Sub(rawMetricsData.MessageSentTime)
+}
+
+type CSVEncodedData struct {
+	MessageSentTime      time.Time     `csv:"MessageSentTime"`
+	MessageReceivedTime  time.Time     `csv:"MessageReceivedTime"`
+	Latency              time.Duration `csv:"Latency"`
+	LatencyInNanoSeconds int           `csv:"LatencyInNanoSeconds"`
+	Partition            int           `csv:"Partition"`
+}
+
+func NewCSVEncodedData(rawMetricsData RawMetricsData) CSVEncodedData {
+	latency := rawMetricsData.Latency()
+	return CSVEncodedData{
+		MessageSentTime:      rawMetricsData.MessageSentTime,
+		MessageReceivedTime:  rawMetricsData.MessageReceivedTime,
+		Latency:              latency,
+		LatencyInNanoSeconds: int(latency.Nanoseconds()),
+		Partition:            rawMetricsData.Partition,
+	}
 }
 
 type Encoder interface {
@@ -97,7 +116,7 @@ func (encoder *encoder) Encode(destination io.Writer) error {
 			return encoder.EncodeAsStruct(metricsDataStream)
 		})
 		for metricsData := range metricsDataStream {
-			csvWriter <- metricsData
+			csvWriter <- NewCSVEncodedData(metricsData)
 		}
 		return nil
 	})
