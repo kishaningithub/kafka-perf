@@ -70,7 +70,7 @@ func NewEncoder(source io.Reader, encoderConfig EncoderConfig) Encoder {
 func (encoder *encoder) EncodeAsStruct(result chan<- RawMetricsData) error {
 	defer close(result)
 	baseErrMsg := "error while extracting raw metrics data"
-	scanner := bufio.NewScanner(encoder.source)
+	scanner := bufio.NewScanner(bufio.NewReader(encoder.source))
 	for scanner.Scan() {
 		text := scanner.Text()
 		var kafkaMessage kafka.Message
