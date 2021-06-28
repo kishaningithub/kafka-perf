@@ -44,9 +44,18 @@ $ cat report.txt
 ## Viewing collected metric information
 
 ```shell
-$ cat result.txt | kafka-perf encode -type=csv -timestamp-field=time > encoded-result.txt
-$ head encoded-result.txt
+# CSV Export
+$ cat result.txt | kafka-perf encode -type=csv -timestamp-field=time > encoded-result.csv
+$ head encoded-result.csv
 ```
+
+## Advanced examples
+
+## Profiling the utility
+
+1. To profile just add `--profile` flag to any command you want to profile
+2. To view the results run `go tool pprof -http=:1235 cpu.pprof`
+3. Open url `http://localhost:1235` in your browser
 
 ## Usage
 
