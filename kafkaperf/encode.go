@@ -72,9 +72,9 @@ func (encoder *encoder) EncodeAsStruct(result chan<- RawMetricsData) error {
 	baseErrMsg := "error while extracting raw metrics data"
 	scanner := bufio.NewScanner(bufio.NewReader(encoder.source))
 	for scanner.Scan() {
-		text := scanner.Text()
+		line := scanner.Bytes()
 		var kafkaMessage kafka.Message
-		err := json.Unmarshal([]byte(text), &kafkaMessage)
+		err := json.Unmarshal(line, &kafkaMessage)
 		if err != nil {
 			return errors.Wrap(err, baseErrMsg)
 		}
