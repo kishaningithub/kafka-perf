@@ -34,3 +34,7 @@ dependency-check: ## Ensure dependencies have no vulnerabilities
 	go list -json -m all | $(NANCY) sleuth --skip-update-check
 
 build: setup download-deps tidy-deps fmt unit-test compile
+
+update-deps:
+	go get -u ./...
+	go mod tidy
