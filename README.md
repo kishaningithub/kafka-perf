@@ -27,17 +27,17 @@ $ brew upgrade kafka-perf
 $ kafka-perf monit --topic example --bootstrap-servers localhost:9092 > result.txt
 
 # With TLS
-$ kafka-perf monit --topic example --bootstrap-servers localhost:9092 -tls-mode TLS -tls-ca-cert /certs/ca.pem > result.txt
+$ kafka-perf monit --topic example --bootstrap-servers localhost:9092 --tls-mode TLS --tls-ca-cert /certs/ca.pem > result.txt
 
 # With MTLS
-$ kafka-perf monit --topic example --bootstrap-servers localhost:9092 -tls-mode MTLS -tls-cert /certs/cert.pem -tls-key /certs/key.pem -tls-ca-cert /certs/ca.pem > result.txt
+$ kafka-perf monit --topic example --bootstrap-servers localhost:9092 --tls-mode MTLS --tls-cert /certs/cert.pem --tls-key /certs/key.pem --tls-ca-cert /certs/ca.pem > result.txt
 ```
 
 ## Generating report
 
 ```shell
 # Text report
-$ cat result.txt | kafka-perf report -type=text -timestamp-field=time > report.txt
+$ cat result.txt | kafka-perf report --type text --timestamp-field time > report.txt
 $ cat report.txt
 ```
 
@@ -45,7 +45,7 @@ $ cat report.txt
 
 ```shell
 # CSV Export
-$ cat result.txt | kafka-perf encode -type=csv -timestamp-field=time > encoded-result.csv
+$ cat result.txt | kafka-perf encode --type csv --timestamp-field time > encoded-result.csv
 $ head encoded-result.csv
 ```
 
