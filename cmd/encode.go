@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/kishaningithub/kafka-perf/kafkaperf"
+	"github.com/pkg/profile"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,9 @@ var encodeCmd = &cobra.Command{
 	Use:   "encode",
 	Short: "Encode results from one encoding to another",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if Profile {
+			defer profile.Start(profile.ProfilePath(".")).Stop()
+		}
 		encoder := kafkaperf.NewEncoder(os.Stdin, kafkaperf.EncoderConfig{
 			Type:           encodeType,
 			TimeStampField: encodeTimeStampField,

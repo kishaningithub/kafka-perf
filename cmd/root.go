@@ -6,6 +6,7 @@ import (
 
 var Version string
 var Verbose bool
+var Profile bool
 
 var rootCmd = &cobra.Command{
 	Use:   "kafka-perf",
@@ -21,6 +22,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(reportCmd)
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
+	rootCmd.PersistentFlags().BoolVar(&Profile, "profile", false, "profile this cli tool")
 }
 
 func Execute() {

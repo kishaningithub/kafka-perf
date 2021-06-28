@@ -10,6 +10,7 @@ require (
 	github.com/klauspost/compress v1.13.0 // indirect
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
+	github.com/pkg/profile v1.6.0
 	github.com/segmentio/kafka-go v0.4.16
 	github.com/spf13/cobra v1.1.3
 	go.uber.org/atomic v1.8.0

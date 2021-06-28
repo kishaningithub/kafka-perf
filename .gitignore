@@ -21,6 +21,7 @@ kafka-perf
 # Result files
 *.txt
 *.csv
+*.pprof
 
 # Tools directory
 tools/*

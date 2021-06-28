@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kishaningithub/kafka-perf/kafkaperf"
+	"github.com/pkg/profile"
 	"golang.org/x/sync/errgroup"
 	"log"
 	"os"
@@ -27,6 +28,9 @@ var monitCmd = &cobra.Command{
 	Use:   "monit",
 	Short: "Monitoring kafka events",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if Profile {
+			defer profile.Start(profile.ProfilePath(".")).Stop()
+		}
 		config := kafkaperf.MonitorConfig{
 			Topic:            topic,
 			BootstrapServers: strings.Split(bootstrapServersCSV, ","),

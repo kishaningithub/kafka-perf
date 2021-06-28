@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/kishaningithub/kafka-perf/kafkaperf"
+	"github.com/pkg/profile"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 	"os"
@@ -19,6 +20,9 @@ var reportCmd = &cobra.Command{
 	Use:   "report",
 	Short: "Outputs a report in the given format",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if Profile {
+			defer profile.Start(profile.ProfilePath(".")).Stop()
+		}
 		reportConfig := kafkaperf.ReporterConfig{
 			Type:           reportType,
 			TimeStampField: reportTimeStampField,
