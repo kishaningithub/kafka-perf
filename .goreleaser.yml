@@ -13,7 +13,7 @@ builds:
   - main: ./main.go
     binary: kafka-perf
     ldflags:
-      - -s -w -X github.com/kishaningithub/kafka-perf/cmd.Version={{.Version}}
+      - -X github.com/kishaningithub/kafka-perf/cmd.Version={{.Version}}
     goos:
       - windows
       - darwin
