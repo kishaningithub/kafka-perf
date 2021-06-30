@@ -30,4 +30,4 @@ brews:
     url_template: "https://github.com/kishaningithub/kafka-perf/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     folder: Formula
     homepage: "https://github.com/kishaningithub/kafka-perf"
-    description: "Tail kafka avro topic data without confluent schema registry overhead"
+    description: "Get performance metrics based on kafka events"
