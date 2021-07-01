@@ -12,6 +12,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"golang.org/x/sync/errgroup"
 	"io"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -70,35 +71,58 @@ func NewEncoder(source io.Reader, encoderConfig EncoderConfig) Encoder {
 func (encoder *encoder) EncodeAsStruct(result chan<- RawMetricsData) error {
 	defer close(result)
 	baseErrMsg := "error while extracting raw metrics data"
-	scanner := bufio.NewScanner(bufio.NewReader(encoder.source))
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		var kafkaMessage kafka.Message
-		err := json.Unmarshal(line, &kafkaMessage)
+	lines := make(chan string, DefaultChannelBufferSize)
+	operation, _ := errgroup.WithContext(context.Background())
+
+	operation.Go(func() error {
+		defer close(lines)
+		scanner := bufio.NewScanner(bufio.NewReader(encoder.source))
+		for scanner.Scan() {
+			line := scanner.Text()
+			lines <- line
+		}
+		return nil
+	})
+	for i := 0; i < runtime.NumCPU(); i++ {
+		operation.Go(func() error {
+			for line := range lines {
+				err := encoder.processLine(line, result)
+				if err != nil {
+					return errors.Wrap(err, baseErrMsg)
+				}
+			}
+			return nil
+		})
+	}
+	return operation.Wait()
+}
+
+func (encoder *encoder) processLine(line string, result chan<- RawMetricsData) error {
+	var kafkaMessage kafka.Message
+	err := json.Unmarshal([]byte(line), &kafkaMessage)
+	if err != nil {
+		return err
+	}
+	ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(kafkaMessage.Value))
+	if err != nil {
+		return err
+	}
+	for ocfReader.Scan() {
+		record, err := ocfReader.Read()
 		if err != nil {
-			return errors.Wrap(err, baseErrMsg)
+			return err
 		}
-		ocfReader, err := goavro.NewOCFReader(bytes.NewBuffer(kafkaMessage.Value))
+		messageSentTime, err := encoder.extractTimeStampFromAvroData(record)
 		if err != nil {
-			return errors.Wrap(err, baseErrMsg)
+			return err
 		}
-		for ocfReader.Scan() {
-			record, err := ocfReader.Read()
-			if err != nil {
-				return errors.Wrap(err, baseErrMsg)
-			}
-			messageSentTime, err := encoder.extractTimeStampFromAvroData(record)
-			if err != nil {
-				return errors.Wrap(err, baseErrMsg)
-			}
-			messageReceivedTime := kafkaMessage.Time
-			rawMetricsData := RawMetricsData{
-				MessageSentTime:     messageSentTime.UTC(),
-				MessageReceivedTime: messageReceivedTime.UTC(),
-				Partition:           kafkaMessage.Partition,
-			}
-			result <- rawMetricsData
+		messageReceivedTime := kafkaMessage.Time
+		rawMetricsData := RawMetricsData{
+			MessageSentTime:     messageSentTime.UTC(),
+			MessageReceivedTime: messageReceivedTime.UTC(),
+			Partition:           kafkaMessage.Partition,
 		}
+		result <- rawMetricsData
 	}
 	return nil
 }
