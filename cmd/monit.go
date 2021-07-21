@@ -55,6 +55,7 @@ var monitCmd = &cobra.Command{
 					log.Println(string(statsJson))
 				} else {
 					_, _ = fmt.Fprintf(os.Stderr, "\r%d events processed", stats.EventsProcessed)
+					_, _ = fmt.Fprintf(os.Stderr, "\r%d duplicate events", stats.DuplicateEvents)
 				}
 				time.Sleep(2 * time.Second)
 			}

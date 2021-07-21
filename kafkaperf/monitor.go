@@ -78,6 +78,7 @@ type MonitorMetrics struct {
 	Lag             int64
 	EventsInProcess int64
 	EventsProcessed int64
+	DuplicateEvents int64
 }
 
 type monitorMetrics struct {
@@ -85,6 +86,7 @@ type monitorMetrics struct {
 	eventsRead      atomic.Int64
 	eventsInProcess atomic.Int64
 	eventsProcessed atomic.Int64
+	duplicateEvents atomic.Int64
 }
 
 func (monitor *monitor) Start() (err error) {
@@ -92,6 +94,7 @@ func (monitor *monitor) Start() (err error) {
 	destination := monitor.destination
 	monitorMetrics := monitor.monitorMetrics
 	events := make(chan string, DefaultChannelBufferSize)
+	uuidSet := make(map[string]bool)
 	operation, _ := errgroup.WithContext(context.Background())
 	operation.Go(func() error {
 		for event := range events {
@@ -110,6 +113,13 @@ func (monitor *monitor) Start() (err error) {
 			message, err := monitor.kafkaReader.FetchMessage(context.Background())
 			if err != nil {
 				return errors.Wrap(err, baseErrMsg)
+			}
+			if len(message.Headers) > 0 {
+				uuid := string(message.Headers[0].Value)
+				if uuidSet[uuid] == true {
+					monitorMetrics.duplicateEvents.Add(1)
+				}
+				uuidSet[uuid] = true
 			}
 			monitorMetrics.eventsRead.Add(1)
 			monitorMetrics.eventsInProcess.Add(1)
@@ -133,6 +143,7 @@ func (monitor *monitor) Stats() MonitorMetrics {
 		Lag:             stats.Lag,
 		EventsInProcess: monitorMetrics.eventsInProcess.Load(),
 		EventsProcessed: monitorMetrics.eventsProcessed.Load(),
+		DuplicateEvents: monitorMetrics.duplicateEvents.Load(),
 	}
 }
 
