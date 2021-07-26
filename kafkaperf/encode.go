@@ -76,10 +76,17 @@ func (encoder *encoder) EncodeAsStruct(result chan<- RawMetricsData) error {
 
 	operation.Go(func() error {
 		defer close(lines)
+		baseErrMsg := "error while reading record"
 		scanner := bufio.NewScanner(bufio.NewReader(encoder.source))
+		maxLineLengthInBytes := 10 * 1024 * 1024
+		buf := make([]byte, maxLineLengthInBytes)
+		scanner.Buffer(buf, maxLineLengthInBytes)
 		for scanner.Scan() {
 			line := scanner.Text()
 			lines <- line
+		}
+		if err := scanner.Err(); err != nil {
+			return errors.Wrap(err, baseErrMsg)
 		}
 		return nil
 	})
