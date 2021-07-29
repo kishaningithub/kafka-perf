@@ -8,8 +8,7 @@ This currently expects the data to be written in [Object Container File (OCF)](h
 ## Installation
 
 ```shell
-$ brew tap kishaningithub/tap
-$ brew install kafka-perf
+$ brew install kishaningithub/tap/kafka-perf
 ```
 
 ## Upgrading
