@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -34,9 +35,10 @@ var reportCmd = &cobra.Command{
 		reporter := kafkaperf.NewReporter(reportConfig, encoder, metricsCalculator)
 		parentCtx, cancel := context.WithCancel(context.Background())
 		operation, ctx := errgroup.WithContext(parentCtx)
+		var report strings.Builder
 		operation.Go(func() error {
 			defer cancel()
-			return reporter.GenerateReport(os.Stdout)
+			return reporter.GenerateReport(&report)
 		})
 		operation.Go(func() error {
 			for {
@@ -52,7 +54,11 @@ var reportCmd = &cobra.Command{
 				time.Sleep(2 * time.Second)
 			}
 		})
-		return operation.Wait()
+		if err := operation.Wait(); err != nil {
+			return err
+		}
+		fmt.Println(report.String())
+		return nil
 	},
 }
 
