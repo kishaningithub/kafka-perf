@@ -7,8 +7,16 @@ This currently expects the data to be written in [Object Container File (OCF)](h
 
 ## Installation
 
+### Homebrew
+
 ```shell
 $ brew install kishaningithub/tap/kafka-perf
+```
+
+### Yum
+
+```shell
+yum install -y <<latest rpm url from releases section>>
 ```
 
 ## Upgrading

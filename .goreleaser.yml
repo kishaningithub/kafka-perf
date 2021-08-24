@@ -1,10 +1,5 @@
 project_name: kafka-perf
 
-release:
-  github:
-    owner: kishaningithub
-    name: kafka-perf
-
 before:
   hooks:
     - go mod download
@@ -23,11 +18,22 @@ builds:
       - arm64
 
 brews:
-  - name: kafka-perf
-    tap:
+  - tap:
       owner: kishaningithub
       name: homebrew-tap
-    url_template: "https://github.com/kishaningithub/kafka-perf/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     folder: Formula
-    homepage: "https://github.com/kishaningithub/kafka-perf"
-    description: "Get performance metrics based on kafka events"
+    homepage: https://github.com/kishaningithub/kafka-perf
+    description: Get performance metrics based on kafka events
+    license: MIT
+
+nfpms:
+  -
+    id: kafka-perf
+    package_name: kafka-perf
+    homepage: https://github.com/kishaningithub/kafka-perf
+    description: Get performance metrics based on kafka events
+    license: MIT
+    formats:
+      - apk
+      - deb
+      - rpm
