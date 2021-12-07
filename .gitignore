@@ -28,3 +28,6 @@ tools/*
 
 # Dependency graphs
 graph.svg
+
+# Test file
+report-9-million.txt.gz
